@@ -85,3 +85,107 @@ def kalman_filter(y, a_init, P_init, Z, H, T, R, Q):
             P[t + 1] = TT.dot(P[t]).dot(L.T) + RR.dot(QQ).dot(RR.T)
         
     return v, K, Finv
+
+def fast_state_smoother(v, K, Finv, a_init, P_init, Z, T, R, Q):
+    """
+    Runs an efficient smoothing algorithm to get posterior mean of state 
+    vector.
+
+    Parameters are as in kalman_filter.
+    """
+    # infer dimensions
+    Ny, Np = v.shape
+    Nm = K.shape[1]
+    
+    # preallocate
+    r = np.empty((Ny, Nm))
+    r[-1] = 0
+    alpha = np.empty((Ny, Nm))
+    
+    # calculate r
+    for t in range(Ny - 1, -1, -1):
+        if Z.ndim == 2:
+            ZZ = Z
+        else:
+            ZZ = Z[t]
+
+        if T.ndim == 2:
+            TT = T
+        else:
+            TT = T[t]
+
+        if R.ndim == 2:
+            RR = R
+        else:
+            RR = R[t]
+
+        if Q.ndim == 2:
+            QQ = Q
+        else:
+            QQ = Q[t]
+
+        u = Finv[t].dot(v[t]) - K[t].T.dot(r[t])
+        thisr = ZZ.T.dot(u) + TT.T.dot(r[t])
+        if t > 0:
+            r[t - 1] = thisr
+        else:
+            r_init = thisr
+            
+    # run model forward
+    alpha[0] = a_init + P_init.dot(r_init)
+    RQR = RR.dot(QQ).dot(RR.T)
+
+    for t in range(0, Ny - 1):
+        alpha[t + 1] = TT.dot(alpha[t]) + RQR.dot(r[t])
+        
+    return alpha
+
+def simulate(y, a_init, P_init, Z, H, T, R, Q):
+    """
+    Draw a sample of the state trajectory from the smoothed posterior.
+    """
+    # get dimensions:
+    Ny, Np = y.shape
+    Nm = Z.shape[1]
+    Nr = Q.shape[0]
+    
+    # preallocate
+    alpha_plus = np.empty((Ny, Nm))
+    y_plus = np.empty((Ny, Np))
+    
+    # simulate data
+    alpha_plus[0] = np.random.multivariate_normal(a_init, P_init)
+
+    for t in range(Ny):
+        if Z.ndim == 2:
+            ZZ = Z
+        else:
+            ZZ = Z[t]
+
+        if T.ndim == 2:
+            TT = T
+        else:
+            TT = T[t]
+
+        # draw disturbances
+        eps = np.random.multivariate_normal(np.zeros(Np), H)
+        eta = np.random.multivariate_normal(np.zeros(Nr), Q)
+    
+        y_plus[t] = ZZ.dot(alpha_plus[t]) + eps
+        if t + 1 < Ny:
+            alpha_plus[t + 1] = TT.dot(alpha_plus[t]) + R.dot(eta)
+            
+    # calculate smoothed means:
+    
+    # actual data
+    v, K, Finv = kalman_filter(y, a_init, P_init, Z, H, T, R, Q)
+    alpha_hat = fast_state_smoother(v, K, Finv, a_init, P_init, Z, T, R, Q)
+    
+    # simulated data
+    v, K, Finv = kalman_filter(y_plus, a_init, P_init, Z, H, T, R, Q)
+    alpha_hat_plus = fast_state_smoother(v, K, Finv, a_init, P_init, Z, T, R, Q)
+    
+    # combine
+    alpha_draw = alpha_plus - alpha_hat_plus + alpha_hat
+    
+    return alpha_draw
