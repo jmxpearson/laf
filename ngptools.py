@@ -15,7 +15,7 @@ def _Z(delta, sigU, sigA):
     """
     return np.array([1.0, 0, 0])
 
-def _G(delta, sigU, sigA, approx=True):
+def _G(delta, sigU, sigA, approx=False):
     """
     State transition matrix. Defined in (5) of Zhu and Dunson.
     """
@@ -27,7 +27,7 @@ def _G(delta, sigU, sigA, approx=True):
 
     return gmat
 
-def _W(delta, sigU, sigA, approx=True):
+def _W(delta, sigU, sigA, approx=False):
     """
     Covariance of state disturbances. Defined in (5) of Zhu and Dunson.
     """
@@ -51,7 +51,7 @@ def _W(delta, sigU, sigA, approx=True):
     return wmat
 
 def _assemble_matrices(dims, delta, sigeps, sigU, sigA, sigmu, sigalpha, 
-    approx=True):
+    approx=False):
     """
     Take nested GP parameters and return matrices suitable for feeding into
     state space model.
@@ -85,7 +85,7 @@ def _assemble_matrices(dims, delta, sigeps, sigU, sigA, sigmu, sigalpha,
 
     return Z, H, T, R, Q, a_init, P_init
 
-def generate(dims, delta, sigeps, sigU, sigA, sigmu, sigalpha, approx=True):
+def generate(dims, delta, sigeps, sigU, sigA, sigmu, sigalpha, approx=False):
     """
     Generate nGP data according to the state space model. Uses matrices
     constructed in _assemble_matrices.
@@ -117,7 +117,7 @@ def generate(dims, delta, sigeps, sigU, sigA, sigmu, sigalpha, approx=True):
     return y, alpha
 
 def sample(y, Nsamples, dims, delta, sigeps, sigU, sigA, sigmu, sigalpha, 
-    approx=True):
+    approx=False):
     """
     Sample Nsamples times from the nGP posterior, given observations y.
     """
