@@ -15,36 +15,43 @@ def _Z(delta, sigU, sigA):
     """
     return np.array([1.0, 0, 0])
 
-def _G(delta, sigU, sigA):
+def _G(delta, sigU, sigA, approx=False):
     """
     State transition matrix. Defined in (5) of Zhu and Dunson.
     """
     gmat = np.eye(3)
     gmat[0, 1] = delta
     gmat[1, 2] = delta
-    gmat[0, 2] = delta**2 / 2
+    if not approx:
+        gmat[0, 2] = delta**2 / 2
+
     return gmat
 
-def _W(delta, sigU, sigA):
+def _W(delta, sigU, sigA, approx=False):
     """
     Covariance of state disturbances. Defined in (5) of Zhu and Dunson.
     """
     ssu = sigU**2
     ssa = sigA**2
-    wmat = np.empty((3, 3))
-    wmat[0, 0] = (delta**3 / 3) * ssu + (delta**5 / 20) * ssa
-    wmat[0, 1] = (delta**2 / 2) * ssu + (delta**4 / 8) * ssa
-    wmat[0, 2] = (delta**3 / 6) * ssa
-    wmat[1, 0] = wmat[0, 1]
-    wmat[1, 1] = delta * ssu + (delta**3 / 3) * ssa
-    wmat[1, 2] = (delta**2 / 2) * ssa
-    wmat[2, 0] = wmat[0, 2]
-    wmat[2, 1] = wmat[1, 2]
-    wmat[2, 2] = delta * ssa
+
+    if approx:
+        wmat = delta * np.diag([ssu, ssa])
+    else:
+        wmat = np.empty((3, 3))
+        wmat[0, 0] = (delta**3 / 3) * ssu + (delta**5 / 20) * ssa
+        wmat[0, 1] = (delta**2 / 2) * ssu + (delta**4 / 8) * ssa
+        wmat[0, 2] = (delta**3 / 6) * ssa
+        wmat[1, 0] = wmat[0, 1]
+        wmat[1, 1] = delta * ssu + (delta**3 / 3) * ssa
+        wmat[1, 2] = (delta**2 / 2) * ssa
+        wmat[2, 0] = wmat[0, 2]
+        wmat[2, 1] = wmat[1, 2]
+        wmat[2, 2] = delta * ssa
 
     return wmat
 
-def _assemble_matrices(dims, delta, sigeps, sigU, sigA, sigmu, sigalpha):
+def _assemble_matrices(dims, delta, sigeps, sigU, sigA, sigmu, sigalpha, 
+    approx=False):
     """
     Take nested GP parameters and return matrices suitable for feeding into
     state space model.
@@ -55,23 +62,30 @@ def _assemble_matrices(dims, delta, sigeps, sigU, sigA, sigmu, sigalpha):
     Nt = delta.size  # number of time points
     Np, Nm, Nr = dims
 
+    if approx:
+        Nr = 2
+
     # allocate arrays:
     Z = _Z(0, sigU, sigA).reshape(1, -1)
     H = np.array(sigeps).reshape(Np, Np)
     T = np.empty((Nt, Nm, Nm))
-    R = np.eye(Nr)
+    if approx:
+        R = np.zeros((Nm, Nr))
+        R[1:] = np.eye(2)
+    else:
+        R = np.eye(Nr)
     Q = np.empty((Nt, Nr, Nr))
 
     for t in range(Nt):
-        T[t] = _G(delta[t], sigU, sigA)
-        Q[t] = _W(delta[t], sigU, sigA)
+        T[t] = _G(delta[t], sigU, sigA, approx)
+        Q[t] = _W(delta[t], sigU, sigA, approx)
 
     a_init = np.zeros(Nm)
     P_init = np.diag([sigmu, sigmu, sigalpha])
 
     return Z, H, T, R, Q, a_init, P_init
 
-def generate(dims, delta, sigeps, sigU, sigA, sigmu, sigalpha):
+def generate(dims, delta, sigeps, sigU, sigA, sigmu, sigalpha, approx=False):
     """
     Generate nGP data according to the state space model. Uses matrices
     constructed in _assemble_matrices.
@@ -82,8 +96,11 @@ def generate(dims, delta, sigeps, sigU, sigA, sigmu, sigalpha):
     Nt = delta.size
     Np, Nm, Nr = dims
 
+    if approx:
+        Nr = 2
+
     Z, H, T, R, Q, a_init, P_init = _assemble_matrices(dims, delta,
-        sigeps, sigU, sigA, sigmu, sigalpha)
+        sigeps, sigU, sigA, sigmu, sigalpha, approx)
 
     alpha = np.empty((Nt, Nm))
     y = np.empty((Nt, Np))
@@ -99,16 +116,17 @@ def generate(dims, delta, sigeps, sigU, sigA, sigmu, sigalpha):
 
     return y, alpha
 
-def sample(y, Nsamples, dims, delta, sigeps, sigU, sigA, sigmu, sigalpha):
+def sample(y, Nsamples, dims, delta, sigeps, sigU, sigA, sigmu, sigalpha, 
+    approx=False):
     """
     Sample Nsamples times from the nGP posterior, given observations y.
     """
 
     Nt = delta.size
-    Np, Nm, Nr = dims
+    Np, Nm, _ = dims
 
     Z, H, T, R, Q, a_init, P_init = _assemble_matrices(dims, delta,
-        sigeps, sigU, sigA, sigmu, sigalpha)
+        sigeps, sigU, sigA, sigmu, sigalpha, approx)
 
     alpha_samples = np.empty((Nsamples, Nt, Nm))
 
