@@ -56,12 +56,12 @@ function kalman_filter(y, a0, P0, Z, H, T, R, Q)
         v_t = y_t - Z_t * a_t
         F_t = Z_t * P_t * Z_t' + H_t
         Finv_t = inv(F_t)
-        K_t = T * P_t * Z_t' * Finv_t
+        K_t = T_t * P_t * Z_t' * Finv_t
         L_t = T_t - K_t * Z_t
         
         if t < Nt
-            a[:, t + 1] = T * a_t + K_t * v_t
-            P[:, :, t + 1] = T * P_t * L_t' + R_t * Q_t * R_t'
+            a[:, t + 1] = T_t * a_t + K_t * v_t
+            P[:, :, t + 1] = T_t * P_t * L_t' + R_t * Q_t * R_t'
         end
 
         v[:, t] = v_t
@@ -96,9 +96,10 @@ function fast_state_smoother(v, K, Finv, a0, P0, Z, T, R, Q)
         local K_t = K[:, :, t]
         local r_t = r[:, t]
         local Z_t = Z[:, :, min(t, size(Z, 3))]
+        local T_t = T[:, :, min(t, size(T, 3))]
         
         local u = Finv_t * v_t - K_t' * r_t
-        local thisr = Z_t' * u + T' * r_t
+        local thisr = Z_t' * u + T_t' * r_t
         
         if t - 1 > 0
             r[:, t - 1] = thisr
