@@ -67,7 +67,7 @@ function assemble_matrices(dims, δ, σϵ, σU, σA, σμ, σα, approx=false)
     end
 
     # allocate arrays:
-    H = σϵ
+    H = σϵ * ones(1, 1)
     T = Array(Float64, Nm, Nm, Nt)
 
     if approx
