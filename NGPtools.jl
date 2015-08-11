@@ -10,7 +10,7 @@ Observation matrix for state space model. In this case, simply picks out
 the first entry of the state space vector, which is U.
 """
 function Z(δ, σU, σA)
-    return [1 0 0]
+    return reshape([1., 0., 0.], 1, 3, 1)::Array{Float64}
 end
 
 
