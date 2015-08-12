@@ -17,7 +17,7 @@ end
 """
 State transition matrix. Defined in (5) of Zhu and Dunson.
 """
-function G(δ, σU, σA, approx=false)
+function G(δ, σU, σA; approx=false)
     gmat = eye(3)
     gmat[1, 2] = δ
     gmat[2, 3] = δ
@@ -31,7 +31,7 @@ end
 """
 Covariance of state disturbances. Defined in (5) of Zhu and Dunson.
 """
-function W(δ, varU, varA, approx=false)
+function W(δ, varU, varA; approx=false)
     if approx
         wmat = δ * diagm([varU, varA])
     else
@@ -58,7 +58,7 @@ state space model.
 dims is a tuple (Np, Nm, Nr) of state space dimensions:
     (observation, state, noise)
 """
-function assemble_matrices(dims, δ, σϵ, σU, σA, σμ, σα, approx=false)
+function assemble_matrices(dims, δ, σϵ, σU, σA, σμ, σα; approx=false)
     Nt = length(δ)  # number of time points
     Np, Nm, Nr = dims
 
@@ -98,7 +98,7 @@ constructed in assemble_matrices.
 dims is a tuple (Np, Nm, Nr) of state space dimensions:
     (observation, state, noise)
 """
-function generate(dims, δ, σϵ, σU, σA, σμ, σα, approx=false)
+function generate(dims, δ, σϵ, σU, σA, σμ, σα; approx=false)
     Nt = length(δ)
 
     Np, Nm, Nr = dims
@@ -133,7 +133,7 @@ end
 """
 Sample Ns times from the nGP posterior, given observations y.
 """
-function sample(y, Ns, dims, δ, σϵ, σU, σA, σμ, σα, approx=false)
+function sample(y, Ns, dims, δ, σϵ, σU, σA, σμ, σα; approx=false)
     Nt = length(δ)
     Np, Nm, _ = dims
 
