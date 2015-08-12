@@ -69,7 +69,7 @@ function kalman_filter(y, a0, P0, Z, H, T, R, Q)
         Finv[:, :, t] = Finv_t
     end
 
-    return v, K, Finv
+    return v, K, Finv, a, P
 end
 
 """
@@ -126,7 +126,7 @@ end
 """
 Draw a sample of the state trajectory from the smoothed posterior.
 """
-function simulate(y, a0, P0, Z, H, T, R, Q)
+function simulate(y, a0, P0, Z, H, T, R, Q; interleaved=true)
     # get dimensions
     Np, Nt = size(y)
     Nm = size(a0, 1)
@@ -158,19 +158,128 @@ function simulate(y, a0, P0, Z, H, T, R, Q)
     end
 
     # calculate smoothed means:
+    if interleaved
+        # actual data
+        v, K, Finv, a, P = interleaved_kalman_filter(y, a0, P0, Z, H, T, R, Q)
+        alpha_hat = interleaved_state_smoother(v, K, Finv, a0, P0, Z, T, R, Q)
 
-    # actual data
-    v, K, Finv = kalman_filter(y, a0, P0, Z, H, T, R, Q)
-    alpha_hat = fast_state_smoother(v, K, Finv, a0, P0, Z, T, R, Q)
+        # simulated data
+        v, K, Finv, a, P = interleaved_kalman_filter(y_plus, a0, P0, Z, H, T, R, Q)
+        alpha_hat_plus = interleaved_state_smoother(v, K, Finv, a0, P0, Z, T, R, Q)
 
-    # simulated data
-    v, K, Finv = kalman_filter(y_plus, a0, P0, Z, H, T, R, Q)
-    alpha_hat_plus = fast_state_smoother(v, K, Finv, a0, P0, Z, T, R, Q)
+    else
+        # actual data
+        v, K, Finv, a, P = kalman_filter(y, a0, P0, Z, H, T, R, Q)
+        alpha_hat = fast_state_smoother(v, K, Finv, a0, P0, Z, T, R, Q)
+
+        # simulated data
+        v, K, Finv, a, P = kalman_filter(y_plus, a0, P0, Z, H, T, R, Q)
+        alpha_hat_plus = fast_state_smoother(v, K, Finv, a0, P0, Z, T, R, Q)
+    end
 
     # combine
     alpha_draw = alpha_plus - alpha_hat_plus + alpha_hat
 
     return alpha_draw
+end
+
+"""
+Like Kalman filter, but works by transforming a vector-valued 
+observation into a sequence of scalar observations.
+"""
+function interleaved_kalman_filter(y, a0, P0, Z, H, T, R, Q)
+    # test for diagonality of H
+    # H (minus its diagonals) should be the 0 matrix
+    if ndims(H) == 2
+        assert(H == diagm(diag(H)))
+    end
+
+    Np, Nt = size(y)
+    Nm = size(P0, 1)
+
+    # preallocate
+    a = Array(Float64, Nm, Np + 1, Nt)
+    P = Array(Float64, Nm, Nm, Np + 1, Nt)
+    v = Array(Float64, Np, Nt)
+    Finv = Array(Float64, Np, Nt)
+    K = Array(Float64, Nm, Np, Nt)
+
+    # initialize
+    a[:, 1, 1] = a0
+    P[:, :, 1, 1] = P0
+
+    for t in 1:Nt, i in 1:Np
+        local Z_t = Z[:, :, min(t, size(Z, 3))]
+        local H_t = H[:, :, min(t, size(H, 3))]
+        local T_t = T[:, :, min(t, size(T, 3))]
+        local R_t = R[:, :, min(t, size(R, 3))]
+        local Q_t = Q[:, :, min(t, size(Q, 3))]
+        z = squeeze(Z_t[i, :], 1)  # now a column vector
+
+        v[i, t] = y[i, t] - dot(z, a[:, i, t])
+        F = dot(z, P[:, :, i, t] * z) + H_t[i, i]
+        Finv[i, t] = 1. / F
+        if F != 0
+            K[:, i, t] = P[:, :, i, t] * z * Finv[i, t]
+        else
+            K[:, i, t] = 0
+        end
+        
+        a[:, i + 1, t] = a[:, i, t] + K[:, i, t] * v[i, t]
+        P[:, :, i + 1, t] = P[:, :, i, t] - F * (K[:, i, t] * K[:, i, t]')
+        
+        if i == Np && t < Nt
+            a[:, 1, t + 1] = T_t * a[:, Np + 1, t]
+            P[:, :, 1, t + 1] = T_t * P[:, :, Np + 1, t] * T_t' + R_t * Q_t * R_t'
+        end
+    end
+
+    return v, K, Finv, a, P
+end
+
+
+function interleaved_state_smoother(v, K, Finv, a0, P0, Z, T, R, Q)
+    # infer dimensions
+    Np, Nt = size(v)
+    Nm = size(P0, 1) 
+
+    # preallocate
+    r = Array(Float64, Nm, Np + 1, Nt)
+
+    # initialize
+    r[:, end, end] = 0
+
+    # iterate backward
+    for t in Nt:-1:1, i in (Np + 1):-1:2
+        ii = i - 1  # handles offset between r and Z/K/F indices
+
+        Z_t = Z[:, :, min(t, size(Z, 3))]
+        L = eye(Nm) - K[:, ii, t] * Z_t[ii, :] 
+        z = squeeze(Z_t[ii, :], 1)  # now a column vector
+        
+        r[:, i - 1, t] = z * (v[ii, t] * Finv[ii, t]) + L' * r[:, i, t]
+        
+        if i == 2 && t > 1
+            # note: t - 1 !
+            T_t = T[:, :, min(t - 1, size(T, 3))]
+            r[:, Np + 1, t - 1] = T_t' * r[:, 1, t]
+        end
+    end
+
+    # initialize again
+    α = Array(Float64, Nm, Nt)
+    α[:, 1] = a0 + P0 * r[:, 1, 1]
+
+    for t in 1:(Nt - 1)
+        local T_t = T[:, :, min(t, size(T, 3))]
+        local R_t = R[:, :, min(t, size(R, 3))]
+        local Q_t = Q[:, :, min(t, size(Q, 3))]
+        local RQR = R_t * Q_t * R_t'
+
+        α[:, t + 1] = T_t * α[:, t] + RQR * r[:, 1, t + 1]
+    end
+
+    return α
 end
 
 end  # module
