@@ -67,7 +67,7 @@ def _assemble_matrices(dims, delta, sigeps, sigU, sigA, sigmu, sigalpha,
 
     # allocate arrays:
     Z = _Z(0, sigU, sigA).reshape(1, -1)
-    H = np.array(sigeps).reshape(Np, Np)
+    H = np.array(sigeps**2).reshape(Np, Np)
     T = np.empty((Nt, Nm, Nm))
     if approx:
         R = np.zeros((Nm, Nr))

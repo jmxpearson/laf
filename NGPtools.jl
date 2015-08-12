@@ -67,7 +67,7 @@ function assemble_matrices(dims, δ, σϵ, σU, σA, σμ, σα; approx=false)
     end
 
     # allocate arrays:
-    H = σϵ * ones(1, 1)
+    H = σϵ^2 * ones(1, 1)
     T = Array(Float64, Nm, Nm, Nt)
 
     if approx
@@ -80,8 +80,8 @@ function assemble_matrices(dims, δ, σϵ, σU, σA, σμ, σα; approx=false)
     Q = Array(Float64, Nr, Nr, Nt)
 
     for t in 1:Nt
-        T[:, :, t] = G(δ[t], σU, σA, approx)
-        Q[:, :, t] = W(δ[t], σU^2, σA^2, approx)
+        T[:, :, t] = G(δ[t], σU, σA, approx=approx)
+        Q[:, :, t] = W(δ[t], σU^2, σA^2, approx=approx)
     end
 
     a0 = zeros(Nm)
@@ -107,7 +107,7 @@ function generate(dims, δ, σϵ, σU, σA, σμ, σα; approx=false)
         Nr = 2
     end
 
-    Z, H, T, R, Q, a0, P0 = assemble_matrices(dims, δ, σϵ, σU, σA, σμ, σα, approx)
+    Z, H, T, R, Q, a0, P0 = assemble_matrices(dims, δ, σϵ, σU, σA, σμ, σα, approx=approx)
 
     α = Array(Float64, Nm, Nt)
     y = Array(Float64, Np, Nt)
@@ -137,7 +137,7 @@ function sample(y, Ns, dims, δ, σϵ, σU, σA, σμ, σα; approx=false)
     Nt = length(δ)
     Np, Nm, _ = dims
 
-    Z, H, T, R, Q, a0, P0 = assemble_matrices(dims, δ, σϵ, σU, σA, σμ, σα, approx)
+    Z, H, T, R, Q, a0, P0 = assemble_matrices(dims, δ, σϵ, σU, σA, σμ, σα, approx=approx)
 
     α_samples = Array(Float64, Nm, Nt, Ns)
 
