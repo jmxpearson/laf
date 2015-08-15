@@ -214,7 +214,7 @@ function interleaved_kalman_filter(y, a0, P0, Z, H, T, R, Q)
         local T_t = ndims(T) < 3 ? T : slice(T, :, :, t)
         local R_t = ndims(R) < 3 ? R : slice(R, :, :, t)
         local Q_t = ndims(Q) < 3 ? Q : slice(Q, :, :, t)
-        z = squeeze(Z_t[i, :], 1)  # now a column vector
+        z = vec(full(Z_t[i, :]))  # now a column vector
 
         v[i, t] = y[i, t] - dot(z, a[:, i, t])
         F = dot(z, P[:, :, i, t] * z) + H_t[i, i]
@@ -255,7 +255,7 @@ function interleaved_state_smoother(v, K, Finv, a0, P0, Z, T, R, Q)
 
         local Z_t = ndims(Z) < 3 ? Z : slice(Z, :, :, t)
         L = eye(Nm) - K[:, ii, t] * Z_t[ii, :] 
-        z = squeeze(Z_t[ii, :], 1)  # now a column vector
+        z = vec(full(Z_t[ii, :]))  # now a column vector
         
         r[:, i - 1, t] = z * (v[ii, t] * Finv[ii, t]) + L' * r[:, i, t]
         
