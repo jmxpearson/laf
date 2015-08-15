@@ -44,14 +44,14 @@ function kalman_filter(y, a0, P0, Z, H, T, R, Q)
 
     # iterate
     for t in 1:Nt
-        local a_t = a[:, t]
-        local P_t = P[:, :, t]
-        local y_t = y[:, t]
-        local Z_t = Z[:, :, min(t, size(Z, 3))]
-        local H_t = H[:, :, min(t, size(H, 3))]
-        local T_t = T[:, :, min(t, size(T, 3))]
-        local R_t = R[:, :, min(t, size(R, 3))]
-        local Q_t = Q[:, :, min(t, size(Q, 3))]
+        a_t = slice(a, :, t)
+        P_t = slice(P, :, :, t)
+        y_t = slice(y, :, t)
+        local Z_t = ndims(Z) < 3 ? Z : Z[:, :, t]
+        local H_t = ndims(H) < 3 ? H : H[:, :, t]
+        local T_t = ndims(T) < 3 ? T : T[:, :, t]
+        local R_t = ndims(R) < 3 ? R : R[:, :, t]
+        local Q_t = ndims(Q) < 3 ? Q : Q[:, :, t]
 
         v_t = y_t - Z_t * a_t
         F_t = Z_t * P_t * Z_t' + H_t
@@ -91,12 +91,12 @@ function fast_state_smoother(v, K, Finv, a0, P0, Z, T, R, Q)
 
     # iterate backward
     for t in Nt:-1:1
-        local Finv_t = Finv[:, :, t]
-        local v_t = v[:, t]
-        local K_t = K[:, :, t]
-        local r_t = r[:, t]
-        local Z_t = Z[:, :, min(t, size(Z, 3))]
-        local T_t = T[:, :, min(t, size(T, 3))]
+        Finv_t = Finv[:, :, t]
+        v_t = v[:, t]
+        K_t = K[:, :, t]
+        r_t = r[:, t]
+        local Z_t = ndims(Z) < 3 ? Z : Z[:, :, t]
+        local T_t = ndims(T) < 3 ? T : T[:, :, t]
         
         local u = Finv_t * v_t - K_t' * r_t
         local thisr = Z_t' * u + T_t' * r_t
@@ -112,9 +112,9 @@ function fast_state_smoother(v, K, Finv, a0, P0, Z, T, R, Q)
     alpha[:, 1] = a0 + P0 * r0
 
     for t in 1:(Nt - 1)
-        local T_t = T[:, :, min(t, size(T, 3))]
-        local R_t = R[:, :, min(t, size(R, 3))]
-        local Q_t = Q[:, :, min(t, size(Q, 3))]
+        local T_t = ndims(T) < 3 ? T : T[:, :, t]
+        local R_t = ndims(R) < 3 ? R : R[:, :, t]
+        local Q_t = ndims(Q) < 3 ? Q : Q[:, :, t]
         local RQR = R_t * Q_t * R_t'
 
         alpha[:, t + 1] = T_t * alpha[:, t] + RQR * r[:, t]
@@ -140,15 +140,14 @@ function simulate(y, a0, P0, Z, H, T, R, Q; interleaved=true)
     alpha_plus[:, 1] = rand(MvNormal(a0, P0))
 
     for t in 1:Nt
-
-        local Z_t = Z[:, :, min(t, size(Z, 3))]
-        local H_t = H[:, :, min(t, size(H, 3))]
-        local T_t = T[:, :, min(t, size(T, 3))]
-        local R_t = R[:, :, min(t, size(R, 3))]
-        local Q_t = Q[:, :, min(t, size(Q, 3))]
+        local Z_t = ndims(Z) < 3 ? Z : Z[:, :, t]
+        local H_t = ndims(H) < 3 ? H : H[:, :, t]
+        local T_t = ndims(T) < 3 ? T : T[:, :, t]
+        local R_t = ndims(R) < 3 ? R : R[:, :, t]
+        local Q_t = ndims(Q) < 3 ? Q : Q[:, :, t]
 
         # draw disturbances
-        ϵ = rand(MvNormal(H_t))
+        local ϵ = rand(MvNormal(H_t))
         y_plus[:, t] = Z_t * alpha_plus[:, t] + ϵ
 
         if t < Nt
@@ -209,11 +208,11 @@ function interleaved_kalman_filter(y, a0, P0, Z, H, T, R, Q)
     P[:, :, 1, 1] = P0
 
     for t in 1:Nt, i in 1:Np
-        local Z_t = Z[:, :, min(t, size(Z, 3))]
-        local H_t = H[:, :, min(t, size(H, 3))]
-        local T_t = T[:, :, min(t, size(T, 3))]
-        local R_t = R[:, :, min(t, size(R, 3))]
-        local Q_t = Q[:, :, min(t, size(Q, 3))]
+        Z_t = Z[:, :, min(t, size(Z, 3))]
+        H_t = H[:, :, min(t, size(H, 3))]
+        T_t = T[:, :, min(t, size(T, 3))]
+        R_t = R[:, :, min(t, size(R, 3))]
+        Q_t = Q[:, :, min(t, size(Q, 3))]
         z = squeeze(Z_t[i, :], 1)  # now a column vector
 
         v[i, t] = y[i, t] - dot(z, a[:, i, t])
@@ -271,10 +270,10 @@ function interleaved_state_smoother(v, K, Finv, a0, P0, Z, T, R, Q)
     α[:, 1] = a0 + P0 * r[:, 1, 1]
 
     for t in 1:(Nt - 1)
-        local T_t = T[:, :, min(t, size(T, 3))]
-        local R_t = R[:, :, min(t, size(R, 3))]
-        local Q_t = Q[:, :, min(t, size(Q, 3))]
-        local RQR = R_t * Q_t * R_t'
+        T_t = T[:, :, min(t, size(T, 3))]
+        R_t = R[:, :, min(t, size(R, 3))]
+        Q_t = Q[:, :, min(t, size(Q, 3))]
+        RQR = R_t * Q_t * R_t'
 
         α[:, t + 1] = T_t * α[:, t] + RQR * r[:, 1, t + 1]
     end
