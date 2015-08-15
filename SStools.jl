@@ -44,14 +44,14 @@ function kalman_filter(y, a0, P0, Z, H, T, R, Q)
 
     # iterate
     for t in 1:Nt
-        a_t = slice(a, :, t)
-        P_t = slice(P, :, :, t)
-        y_t = slice(y, :, t)
-        local Z_t = ndims(Z) < 3 ? Z : Z[:, :, t]
-        local H_t = ndims(H) < 3 ? H : H[:, :, t]
-        local T_t = ndims(T) < 3 ? T : T[:, :, t]
-        local R_t = ndims(R) < 3 ? R : R[:, :, t]
-        local Q_t = ndims(Q) < 3 ? Q : Q[:, :, t]
+        local a_t = slice(a, :, t)
+        local P_t = slice(P, :, :, t)
+        local y_t = slice(y, :, t)
+        local Z_t = ndims(Z) < 3 ? Z : slice(Z, :, :, t)
+        local H_t = ndims(H) < 3 ? H : slice(H, :, :, t)
+        local T_t = ndims(T) < 3 ? T : slice(T, :, :, t)
+        local R_t = ndims(R) < 3 ? R : slice(R, :, :, t)
+        local Q_t = ndims(Q) < 3 ? Q : slice(Q, :, :, t)
 
         v_t = y_t - Z_t * a_t
         F_t = Z_t * P_t * Z_t' + H_t
@@ -91,12 +91,12 @@ function fast_state_smoother(v, K, Finv, a0, P0, Z, T, R, Q)
 
     # iterate backward
     for t in Nt:-1:1
-        Finv_t = Finv[:, :, t]
-        v_t = v[:, t]
-        K_t = K[:, :, t]
-        r_t = r[:, t]
-        local Z_t = ndims(Z) < 3 ? Z : Z[:, :, t]
-        local T_t = ndims(T) < 3 ? T : T[:, :, t]
+        local Finv_t = slice(Finv, :, :, t)
+        local v_t = slice(v, :, t)
+        local K_t = slice(K, :, :, t)
+        local r_t = slice(r, :, t)
+        local Z_t = ndims(Z) < 3 ? Z : slice(Z, :, :, t)
+        local T_t = ndims(T) < 3 ? T : slice(T, :, :, t)
         
         local u = Finv_t * v_t - K_t' * r_t
         local thisr = Z_t' * u + T_t' * r_t
@@ -112,9 +112,9 @@ function fast_state_smoother(v, K, Finv, a0, P0, Z, T, R, Q)
     alpha[:, 1] = a0 + P0 * r0
 
     for t in 1:(Nt - 1)
-        local T_t = ndims(T) < 3 ? T : T[:, :, t]
-        local R_t = ndims(R) < 3 ? R : R[:, :, t]
-        local Q_t = ndims(Q) < 3 ? Q : Q[:, :, t]
+        local T_t = ndims(T) < 3 ? T : slice(T, :, :, t)
+        local R_t = ndims(R) < 3 ? R : slice(R,  :, :, t)
+        local Q_t = ndims(Q) < 3 ? Q : slice(Q,  :, :, t)
         local RQR = R_t * Q_t * R_t'
 
         alpha[:, t + 1] = T_t * alpha[:, t] + RQR * r[:, t]
@@ -140,10 +140,11 @@ function simulate(y, a0, P0, Z, H, T, R, Q; interleaved=true)
     alpha_plus[:, 1] = rand(MvNormal(a0, P0))
 
     for t in 1:Nt
-        local Z_t = ndims(Z) < 3 ? Z : Z[:, :, t]
+        local Z_t = ndims(Z) < 3 ? Z : slice(Z, :, :, t)
+        local T_t = ndims(T) < 3 ? T : slice(T, :, :, t)
+        local R_t = ndims(R) < 3 ? R : slice(R, :, :, t)
+        # random number generators should take copies, not views?
         local H_t = ndims(H) < 3 ? H : H[:, :, t]
-        local T_t = ndims(T) < 3 ? T : T[:, :, t]
-        local R_t = ndims(R) < 3 ? R : R[:, :, t]
         local Q_t = ndims(Q) < 3 ? Q : Q[:, :, t]
 
         # draw disturbances
@@ -208,11 +209,11 @@ function interleaved_kalman_filter(y, a0, P0, Z, H, T, R, Q)
     P[:, :, 1, 1] = P0
 
     for t in 1:Nt, i in 1:Np
-        Z_t = Z[:, :, min(t, size(Z, 3))]
-        H_t = H[:, :, min(t, size(H, 3))]
-        T_t = T[:, :, min(t, size(T, 3))]
-        R_t = R[:, :, min(t, size(R, 3))]
-        Q_t = Q[:, :, min(t, size(Q, 3))]
+        local Z_t = ndims(Z) < 3 ? Z : slice(Z, :, :, t)
+        local H_t = ndims(H) < 3 ? H : slice(H, :, :, t)
+        local T_t = ndims(T) < 3 ? T : slice(T, :, :, t)
+        local R_t = ndims(R) < 3 ? R : slice(R, :, :, t)
+        local Q_t = ndims(Q) < 3 ? Q : slice(Q, :, :, t)
         z = squeeze(Z_t[i, :], 1)  # now a column vector
 
         v[i, t] = y[i, t] - dot(z, a[:, i, t])
@@ -252,15 +253,15 @@ function interleaved_state_smoother(v, K, Finv, a0, P0, Z, T, R, Q)
     for t in Nt:-1:1, i in (Np + 1):-1:2
         ii = i - 1  # handles offset between r and Z/K/F indices
 
-        Z_t = Z[:, :, min(t, size(Z, 3))]
+        local Z_t = ndims(Z) < 3 ? Z : slice(Z, :, :, t)
         L = eye(Nm) - K[:, ii, t] * Z_t[ii, :] 
         z = squeeze(Z_t[ii, :], 1)  # now a column vector
         
         r[:, i - 1, t] = z * (v[ii, t] * Finv[ii, t]) + L' * r[:, i, t]
         
         if i == 2 && t > 1
-            # note: t - 1 !
-            T_t = T[:, :, min(t - 1, size(T, 3))]
+            # NOTE: t - 1 BELOW !!!
+            local T_t = ndims(T) < 3 ? T : slice(T, :, :, t - 1)
             r[:, Np + 1, t - 1] = T_t' * r[:, 1, t]
         end
     end
@@ -270,10 +271,10 @@ function interleaved_state_smoother(v, K, Finv, a0, P0, Z, T, R, Q)
     α[:, 1] = a0 + P0 * r[:, 1, 1]
 
     for t in 1:(Nt - 1)
-        T_t = T[:, :, min(t, size(T, 3))]
-        R_t = R[:, :, min(t, size(R, 3))]
-        Q_t = Q[:, :, min(t, size(Q, 3))]
-        RQR = R_t * Q_t * R_t'
+        local T_t = ndims(T) < 3 ? T : slice(T, :, :, t)
+        local R_t = ndims(R) < 3 ? R : slice(R, :, :, t)
+        local Q_t = ndims(Q) < 3 ? Q : slice(Q, :, :, t)
+        local RQR = R_t * Q_t * R_t'
 
         α[:, t + 1] = T_t * α[:, t] + RQR * r[:, 1, t + 1]
     end
