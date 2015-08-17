@@ -24,7 +24,7 @@ State transition matrix. Defined in (5) of Zhu and Dunson. Order of entries
 is all state variables, followed by all derivatives, then all latents.
 Ns is the dimension of the underlying state space.
 """
-function G(Ns, δ, σU, σA; approx=false)
+function G(Ns, δ; approx=false)
     gmat = eye(3 * Ns)
     gmat += diagm(δ * ones(2Ns), Ns)
     if approx
@@ -96,7 +96,7 @@ function assemble_matrices(Np, Ns, δ, σϵ, σU, σA, σμ, σα; approx=false)
     end
 
     for t in 1:Nt
-        T[:, :, t] = G(Ns, δ[t], σU, σA, approx=approx)
+        T[:, :, t] = G(Ns, δ[t], approx=approx)
         Q[:, :, t] = W(Ns, δ[t], σU^2, σA^2, approx=approx)
     end
 
