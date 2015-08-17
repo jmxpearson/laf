@@ -149,9 +149,7 @@ end
 Sample Ns times from the nGP posterior, given observations y.
 Np is the dimension of the observation vector
 """
-function _sample(y, Ns, Np, Nt, δ, σϵ, σU, σA, σμ, σα; approx=false)
-    Z, H, T, R, Q, a0, P0 = assemble_matrices(Np, δ, σϵ, σU, σA, σμ, σα, approx=approx)
-
+function _sample(y, Ns, Nt, a0, P0, Z, H, T, R, Q)
     Nm = size(Z, 2)
 
     α_samples = Array(Float64, Nm, Nt, Ns)
@@ -169,7 +167,8 @@ Version where spacing is uniform, so number of time points must be specified
 explicitly.
 """
 function sample(y, Ns, Np, Nt, δ::Float64, σϵ, σU, σA, σμ, σα; approx=false)
-    _sample(y, Ns, Np, Nt, δ, σϵ, σU, σA, σμ, σα; approx=false)
+    Z, H, T, R, Q, a0, P0 = assemble_matrices(Np, δ, σϵ, σU, σA, σμ, σα, approx=approx)
+    _sample(y, Ns, Nt, a0, P0, Z, H, T, R, Q)
 end
 
 
@@ -179,8 +178,18 @@ points follows from that.
 """
 function sample(y, Ns, Np, δ::Vector{Any}, σϵ, σU, σA, σμ, σα; approx=false)
     Nt = length(δ)
-    _sample(y, Ns, Np, Nt, δ, σϵ, σU, σA, σμ, σα; approx=false)
+    Z, H, T, R, Q, a0, P0 = assemble_matrices(Np, δ, σϵ, σU, σA, σμ, σα, approx=approx)
+    _sample(y, Ns, Nt, a0, P0, Z, H, T, R, Q)
 end
 
+
+"""
+Version where observation model (Z and H) is specified externally.
+"""
+function sample(y, Ns, Np, Z::Matrix{Any}, H::Matrix{Any}, δ::Float64, 
+    σϵ, σU, σA, σμ, σα; approx=false)
+    _, _, T, R, Q, a0, P0 = assemble_matrices(Np, δ, σϵ, σU, σA, σμ, σα, approx=approx)
+    _sample(y, Ns, Nt, a0, P0, Z, H, T, R, Q)
+end
 
 end  # module
