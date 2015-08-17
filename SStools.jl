@@ -148,11 +148,11 @@ function simulate(y, a0, P0, Z, H, T, R, Q; interleaved=true)
         local Q_t = ndims(Q) < 3 ? Q : Q[:, :, t]
 
         # draw disturbances
-        local ϵ = rand(MvNormal(H_t))
+        local ϵ = rand(MvNormal(full(H_t)))
         y_plus[:, t] = Z_t * alpha_plus[:, t] + ϵ
 
         if t < Nt
-            η = rand(MvNormal(Q_t))
+            η = rand(MvNormal(full(Q_t)))
             alpha_plus[:, t + 1] = T_t * alpha_plus[:, t] + R_t * η
         end
     end

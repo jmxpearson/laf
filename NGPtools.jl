@@ -155,7 +155,8 @@ end
 """
 Sample Ns times from the nGP posterior, given observations y.
 """
-function _sample(y, Ns, Nt, a0, P0, Z, H, T, R, Q)
+function _sample(y, Ns, a0, P0, Z, H, T, R, Q)
+    Nt = size(y, 2)
     Nm = size(Z, 2)
 
     α_samples = Array(Float64, Nm, Nt, Ns)
@@ -172,34 +173,22 @@ end
 Version where spacing is uniform, so number of time points must be specified 
 explicitly.
 """
-function sample(y, Nsamples, Nt, Nstates, δ::Float64, σϵ, σU, σA, σμ, σα; approx=false)
+function sample(y, Nsamples, Nstates, δ, σϵ, σU, σA, σμ, σα; approx=false)
     Np = size(y, 1)
     Z, H, T, R, Q, a0, P0 = assemble_matrices(Np, Nstates, δ, σϵ, σU, σA, σμ, σα, approx=approx)
-    _sample(y, Nsamples, Nt, a0, P0, Z, H, T, R, Q)
-end
-
-
-"""
-Version where spacing is non-uniform, so δ is a vector and number of time
-points follows from that.
-"""
-function sample(y, Nsamples, Nstates, δ::Vector{Any}, σϵ, σU, σA, σμ, σα; approx=false)
-    Nt = length(δ)
-    Np = size(y, 1)
-    Z, H, T, R, Q, a0, P0 = assemble_matrices(Np, Nstates, δ, σϵ, σU, σA, σμ, σα, approx=approx)
-    _sample(y, Ns, Nt, a0, P0, Z, H, T, R, Q)
+    _sample(y, Nsamples, a0, P0, Z, H, T, R, Q)
 end
 
 
 """
 Version where observation model (Z and H) is specified externally.
 """
-function sample(y, Nsamples, Z::Matrix{Any}, H::Matrix{Any}, δ::Float64, 
+function sample(y, Nsamples, Z::Array{Float64}, H::Array{Float64}, δ::Float64, 
     σU, σA, σμ, σα; approx=false)
-    Nstates = size(Z, 2)
+    Nstates = convert(Int64, size(Z, 2) / 3)
     Np = size(y, 1)
     _, _, T, R, Q, a0, P0 = assemble_matrices(Np, Nstates, δ, 0, σU, σA, σμ, σα, approx=approx)
-    _sample(y, Ns, Nt, a0, P0, Z, H, T, R, Q)
+    _sample(y, Nsamples, a0, P0, Z, H, T, R, Q)
 end
 
 end  # module
