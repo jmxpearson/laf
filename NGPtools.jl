@@ -155,14 +155,14 @@ end
 """
 Sample Ns times from the nGP posterior, given observations y.
 """
-function _sample(y, Ns, a0, P0, Z, H, T, R, Q)
+function _sample(y, Ns, a0, P0, Z, H, T, R, Q; interleaved=true)
     Nt = size(y, 2)
     Nm = size(Z, 2)
 
     α_samples = Array(Float64, Nm, Nt, Ns)
 
     for idx in 1:Ns
-        α_samples[:, :, idx] = simulate(y, a0, P0, Z, H, T, R, Q)
+        α_samples[:, :, idx] = simulate(y, a0, P0, Z, H, T, R, Q, interleaved=interleaved)
     end
 
     return α_samples
@@ -184,11 +184,11 @@ end
 Version where observation model (Z and H) is specified externally.
 """
 function sample(y, Nsamples, Z::Array{Float64}, H::Array{Float64}, δ::Float64, 
-    σU, σA, σμ, σα; approx=false)
+    σU, σA, σμ, σα; approx=false, interleaved=true)
     Nstates = convert(Int64, size(Z, 2) / 3)
     Np = size(y, 1)
     _, _, T, R, Q, a0, P0 = assemble_matrices(Np, Nstates, δ, 0, σU, σA, σμ, σα, approx=approx)
-    _sample(y, Nsamples, a0, P0, Z, H, T, R, Q)
+    _sample(y, Nsamples, a0, P0, Z, H, T, R, Q; interleaved=interleaved)
 end
 
 end  # module
