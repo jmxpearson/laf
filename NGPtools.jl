@@ -39,25 +39,37 @@ end
 Covariance of state disturbances. Defined in (5) of Zhu and Dunson. Order of
 entries is all state variables, followed by all derivatives, then all latents.
 """
-function W(Ns, δ, varU, varA; approx=false)
+function W(Ns, δ, varU::Array{Float64}, varA::Array{Float64}; approx=false)
     if approx
-        wmat = δ * spdiagm(repeat([varU, varA], inner=[Ns]))
+        wmat = δ * spdiagm([varU ; varA])
     else
         wmat = zeros(Float64, 3Ns, 3Ns)
         for idx in 1:Ns
-            wmat[idx, idx] = (δ^3 / 3)varU + (δ^5 / 20)varA
-            wmat[idx, Ns + idx] = (δ^2 / 2)varU + (δ^4 / 8)varA
-            wmat[idx, 2Ns + idx] = (δ^3 / 6)varA
+            wmat[idx, idx] = (δ^3 / 3)varU[idx] + (δ^5 / 20)varA[idx]
+            wmat[idx, Ns + idx] = (δ^2 / 2)varU[idx] + (δ^4 / 8)varA[idx]
+            wmat[idx, 2Ns + idx] = (δ^3 / 6)varA[idx]
             wmat[Ns + idx, idx] = wmat[idx, Ns + idx]
-            wmat[Ns + idx, Ns + idx] = δ * varU + (δ^3 / 3)varA
-            wmat[Ns + idx, 2Ns + idx] = (δ^2 / 2)varA
+            wmat[Ns + idx, Ns + idx] = δ * varU[idx] + (δ^3 / 3)varA[idx]
+            wmat[Ns + idx, 2Ns + idx] = (δ^2 / 2)varA[idx]
             wmat[2Ns + idx, idx] = wmat[idx, 2Ns + idx]
             wmat[2Ns + idx, Ns + idx] = wmat[Ns + idx, 2Ns + idx]
-            wmat[2Ns + idx, 2Ns + idx] = δ * varA
+            wmat[2Ns + idx, 2Ns + idx] = δ * varA[idx]
         end
     end
 
     return wmat
+end
+
+function W(Ns, δ, varU::Array{Float64}, varA::Float64; approx=false)
+    return W(Ns, δ, varU, varA * ones(Ns); approx=approx)
+end
+
+function W(Ns, δ, varU::Float64, varA::Array{Float64}; approx=false)
+    return W(Ns, δ, varU * ones(Ns), varA; approx=approx)
+end
+
+function W(Ns, δ, varU::Float64, varA::Float64; approx=false)
+    return W(Ns, δ, varU * ones(Ns), varA * ones(Ns); approx=approx)
 end
 
 
@@ -97,7 +109,7 @@ function assemble_matrices(Np, Ns, δ, σϵ, σU, σA, σμ, σα; approx=false)
 
     for t in 1:Nt
         T[:, :, t] = G(Ns, δ[t], approx=approx)
-        Q[:, :, t] = W(Ns, δ[t], σU^2, σA^2, approx=approx)
+        Q[:, :, t] = W(Ns, δ[t], σU.^2, σA.^2, approx=approx)
     end
 
     if Nt == 1
