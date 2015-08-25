@@ -1,6 +1,6 @@
 # labcr: Locally adaptive Bayesian Covariance Regression
 
-An implementation of locally adaptive factor regression models as per [this paper](http://arxiv.org/abs/1210.2022).
+An implementation of locally adaptive factor regression models as per [this paper](http://jmlr.org/papers/volume15/durante14a/durante14a.pdf).
 
 ## Dependencies:
 - Python
