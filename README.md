@@ -1,4 +1,4 @@
-# labcr: Locally adaptive factor processes
+# laf: Locally adaptive factor processes
 
 An implementation of locally adaptive factor processes as per [this paper](http://jmlr.org/papers/volume15/durante14a/durante14a.pdf).
 
